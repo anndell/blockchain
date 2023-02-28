@@ -6,7 +6,7 @@ import "./Anndell.sol";
 contract Factory {
     constructor() {}
     
-    event AnndellCollectionCreated(address AnndellAddress, string name, string symbol, address initiator);
+    event CollectionCreated(address AnndellAddress, string name, string symbol, address initiator);
 
     function createCollection(string calldata _name, string calldata _symbol) external returns (address collection) {
         bytes memory bytecode = abi.encodePacked(
@@ -18,6 +18,6 @@ contract Factory {
             collection := create2(0, add(bytecode, 32), mload(bytecode), salt)
         }
         require(collection != address(0), "Failed to create Anndell collection");
-        emit AnndellCollectionCreated(collection, _name, _symbol, msg.sender);
+        emit CollectionCreated(collection, _name, _symbol, msg.sender);
     }
 }
