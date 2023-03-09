@@ -13,6 +13,7 @@ abstract contract AnndellNested is ERC721Holder, Settings {
 
     function releaseShares(IERC721 _address, address _to, uint[] memory _ids) public onlyRole(ADMIN){
         for (uint i = 0; i < _ids.length; i++) {
+            // if(circulatingSupply != 0) this could be cool
             require(!idLocked[_address][_ids[i]], "Token is locked to this contract");
             _address.safeTransferFrom(address(this), _to, _ids[i]);
         }
