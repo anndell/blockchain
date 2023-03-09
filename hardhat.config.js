@@ -2,6 +2,7 @@ require("dotenv").config();
 require("@nomiclabs/hardhat-waffle");
 require("hardhat-gas-reporter");
 require("@nomiclabs/hardhat-etherscan");
+require('hardhat-contract-sizer');
 
 const TESTNET_PRIVATE_KEY = process.env.TESTNET_PRIVATE_KEY;
 const BSC_RPC = process.env.BSC_RPC;

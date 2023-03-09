@@ -1,16 +1,27 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.17;
 
-import "@openzeppelin/contracts/access/AccessControl.sol";
+import "../contracts/Settings.sol";
 
-contract Whitelist is AccessControl {
+abstract contract Whitelist is Settings{
     
     bytes32 public constant WHITELIST = keccak256("WHITELIST");
 
     mapping(address => bool) public whitelist;
 
+    Whitelist public whitelistAddress;
+
     event AddToWhitelist(address indexed wallet);
     event RemoveFromWhitelist(address indexed wallet);
+    event ChangeWhitelist(address old, address _new);
+    event TransferWhiteListRequired (bool on);
+    event ClaimWhiteListRequired (bool on);
+    event TransferBlocked (bool on);
+
+    modifier notLocked(){
+        require(!whitelistStateLocked, "Whitelist state has been locked");
+        _;
+    }
 
     function addToWhitelist(address[] calldata _addresses) public onlyRole(WHITELIST) {
         for (uint256 index = 0; index < _addresses.length; index++) {
@@ -26,24 +37,24 @@ contract Whitelist is AccessControl {
         }
     }
 
-    function isWhitelisted (address _address) public view {
-        require(whitelist[_address] == true, "Address is not whitelisted");
+    function setTransferWL(bool _on) public onlyRole(ADMIN) notLocked {
+        transferWhiteListRequired = _on;
+        emit TransferWhiteListRequired(_on);
     }
 
-    function _checkRole(bytes32 role, address account) internal view virtual override{
-        if (!(hasRole(role, account) || hasRole(DEFAULT_ADMIN_ROLE, account))) {
-            revert(
-                string(
-                    abi.encodePacked(
-                        "AccessControl: account ",
-                        Strings.toHexString(account),
-                        " is missing role ",
-                        Strings.toHexString(uint256(role), 32),
-                        " or ",
-                        Strings.toHexString(uint256(DEFAULT_ADMIN_ROLE), 32)
-                    )
-                )
-            );
-        }
+    function setClaimWL(bool _on) public onlyRole(ADMIN) notLocked {
+        claimWhiteListRequired = _on;
+        emit ClaimWhiteListRequired(_on);
+    }
+
+    function setTransferBlocked(bool _on) public onlyRole(ADMIN) notLocked {
+        transferBlocked = _on;
+        emit TransferBlocked(_on);
+    }
+
+    function setWhitelist(Whitelist newWhitelist) public onlyRole(ADMIN){
+        require(whitelistAddressLocked, "Whitelist address is locked.");
+        emit ChangeWhitelist(address(whitelistAddress), address(newWhitelist));
+        whitelistAddress = newWhitelist;
     }
 }
