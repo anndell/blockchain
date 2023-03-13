@@ -142,6 +142,7 @@ contract Anndell is Whitelist, AnndellNested {
     }
 
     function _totalToGet(address _token, uint _periodIndex, address _owner, uint[] calldata _shareIds) internal returns (uint totalToGet){
+        require(_owner != address(this)); // I think you need to add this?!?!
         ClaimPeriod storage period = token[_token][_periodIndex];
         if(claimWhiteListRequired){
             require(whitelistAddress.whitelist(_owner), "Address not whitelisted");
@@ -153,7 +154,7 @@ contract Anndell is Whitelist, AnndellNested {
         for (uint256 index = 0; index < _shareIds.length; index++) {
             uint share = _shareIds[index];
             if(share < startMaxTokenId){ 
-                if (ownerOf(share) == _owner || lockedIdToAddress[share] == _owner) {// should be require?
+                if (ownerOf(share) == _owner || lockedIdToAddress[share] == _owner) {// should be require? // what happens if you send in the contract as _owner?!?!
                     totalToGet += target - period.claimedPerShare[share];
                     period.claimedPerShare[share] = target;
                 }
@@ -226,7 +227,6 @@ contract Anndell is Whitelist, AnndellNested {
         for (uint i = 0; i < _tokenIds.length; i++) {
             id = _tokenIds[i];
             require(ownerOf(id) == msg.sender, "Not owner of share.");
-            require(lockedIdToAddress[id] == address(0));
             require(nonBaeringIdToId[id] == 0);
             IERC721(address(this)).safeTransferFrom(msg.sender, address(this), id); // how does this work with whitelist and shit?
             lockedIdToAddress[id] = _receiverAddress;
@@ -241,11 +241,9 @@ contract Anndell is Whitelist, AnndellNested {
         for (uint i = 0; i < _tokenIds.length; i++) {
             id = _tokenIds[i];
             require(ownerOf(id) == msg.sender, "Not owner of share.");
-            require(lockedIdToAddress[id] != address(0));
-            require(nonBaeringIdToId[id] != 0);
+            require(id / 10e21 != 0, "Not a non baering twin");
             _burn(id);
             delete lockedIdToAddress[id];
-            require(ownerOf(nonBaeringIdToId[id]) == address(this), "Share not in custody by contract"); // what am i doing here...
             safeTransferFrom(address(this), msg.sender, nonBaeringIdToId[id]);
             delete nonBaeringIdToId[id];
         }
