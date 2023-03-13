@@ -2,17 +2,22 @@
 pragma solidity ^0.8.17;
 
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC721/utils/ERC721Holder.sol";
+import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "../contracts/Whitelist.sol";
-import "../contracts/AnndellNested.sol";
+import "../interfaces/IAnndellFee.sol";
 
-contract Anndell is Whitelist, AnndellNested {
+contract Anndell is Whitelist {
 
-    constructor (string memory _name, string memory _symbol, address _default_admin) ERC721 (_name, _symbol) {
+    constructor (string memory _name, string memory _symbol, address _default_admin, IAnndellFee _anndellFee) ERC721 (_name, _symbol) {
         _setupRole(DEFAULT_ADMIN_ROLE, _default_admin);
         whitelistAddress = this;
         name_ = _name;
         symbol_ = _symbol;
+        fee = _anndellFee;
     }
+
+    IAnndellFee private fee;
 
     bytes32 public constant MINT = keccak256("MINT");
 
@@ -25,6 +30,8 @@ contract Anndell is Whitelist, AnndellNested {
     uint public firstPeriodStart;
     uint public periodLength = 365 days;
     uint public flushDelay = 90 days;
+
+    mapping(IERC721 => mapping (uint => bool)) public idLocked;
 
     mapping(address => uint) public retroactiveTotals;
     mapping(address => ClaimPeriod[]) public token;
@@ -47,6 +54,7 @@ contract Anndell is Whitelist, AnndellNested {
     event ForceBackShares(uint[] shareIds);
     event CalculateTokenDistribution(address token, uint newShareEarnings);
     event IssuanceLockedUntil(uint timestamp);
+    event TokenLockedToContract(IERC721 tokenContract, uint id);
     
     function issuanceOfShares(uint _nrToIssue) public onlyRole(ADMIN) {
         require(!supplyCapLocked, "No more shares can be issued");
@@ -106,10 +114,17 @@ contract Anndell is Whitelist, AnndellNested {
     function _distribution(ClaimPeriod storage _period, address _token) internal {
         if (_token == address(0)){
             uint balance = address(this).balance - retroactiveTotals[address(0)];
+            (address receiver, uint amount) = fee.getQuote(address(this), balance);
+            (bool sent, ) = receiver.call{value: amount}(""); // test if zero
+            require(sent, "Failed to transfer native token");
+            balance -= amount;
             _period.shareEarnings += (balance - _period.earningsAccountedFor) / _period.startCap;
             _period.earningsAccountedFor = balance;
         }else {
             uint balance = IERC20(_token).balanceOf(address(this)) - retroactiveTotals[_token];
+            (address receiver, uint amount) = fee.getQuote(address(this), balance);
+            IERC20(_token).transfer(receiver, amount);
+            balance -= amount;
             _period.shareEarnings += (balance - _period.earningsAccountedFor) / _period.startCap;
             _period.earningsAccountedFor = balance;
         }
@@ -246,6 +261,23 @@ contract Anndell is Whitelist, AnndellNested {
             delete lockedIdToAddress[id];
             safeTransferFrom(address(this), msg.sender, nonBaeringIdToId[id]);
             delete nonBaeringIdToId[id];
+        }
+    }
+
+    function releaseShares(IERC721 _address, address _to, uint[] memory _ids) public onlyRole(ADMIN){
+        for (uint i = 0; i < _ids.length; i++) {
+            // require(_ids[i] ) // how do we check that the token is not a locked one by our users and is a non baering twin? 
+            require(!idLocked[_address][_ids[i]], "Token is locked to this contract");
+            _address.safeTransferFrom(address(this), _to, _ids[i]);
+        }
+    }
+
+    function lockSharesToContract(IERC721 _address, uint[] memory _ids) public onlyRole(ADMIN) {
+        for (uint i = 0; i < _ids.length; i++) {
+            if(address(this) == _address.ownerOf(_ids[i])){
+                idLocked[_address][_ids[i]] = true;
+                emit TokenLockedToContract(_address, _ids[i]);
+            }
         }
     }
 
