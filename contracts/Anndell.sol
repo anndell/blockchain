@@ -28,6 +28,8 @@ contract Anndell is Whitelist, AnndellNested {
 
     mapping(address => uint) public retroactiveTotals;
     mapping(address => ClaimPeriod[]) public token;
+    mapping(uint => address) public lockedIdToAddress;
+    mapping(uint => uint) public nonBaeringIdToId;
 
     struct ClaimPeriod {
         uint start;
@@ -150,10 +152,11 @@ contract Anndell is Whitelist, AnndellNested {
         uint startMaxTokenId = period.startMaxTokenId + 1;
         for (uint256 index = 0; index < _shareIds.length; index++) {
             uint share = _shareIds[index];
-            if(share < startMaxTokenId){
-                require(ownerOf(share) == _owner, "Not owner of share");
-                totalToGet += target - period.claimedPerShare[share];
-                period.claimedPerShare[share] = target;
+            if(share < startMaxTokenId){ 
+                if (ownerOf(share) == _owner || lockedIdToAddress[share] == _owner) {// should be require?
+                    totalToGet += target - period.claimedPerShare[share];
+                    period.claimedPerShare[share] = target;
+                }
             }
         }
         if(_periodIndex < token[_token].length - 1){
@@ -215,6 +218,37 @@ contract Anndell is Whitelist, AnndellNested {
     
     function getBalance() public view returns(uint){
         return address(this).balance;
+    }
+
+    function issueNonBaering(uint[] memory _tokenIds, address _receiverAddress) public {
+        uint idToIssue;
+        uint id;
+        for (uint i = 0; i < _tokenIds.length; i++) {
+            id = _tokenIds[i];
+            require(ownerOf(id) == msg.sender, "Not owner of share.");
+            require(lockedIdToAddress[id] == address(0));
+            require(nonBaeringIdToId[id] == 0);
+            IERC721(address(this)).safeTransferFrom(msg.sender, address(this), id); // how does this work with whitelist and shit?
+            lockedIdToAddress[id] = _receiverAddress;
+            idToIssue = id + 10e21; // put in check that we can never mint real ones higher than this number.
+            nonBaeringIdToId[idToIssue] = id;
+            _safeMint(msg.sender, idToIssue);
+        }
+    }
+
+    function redeemNonBaeringToken(uint[] memory _tokenIds) public {
+        uint id;
+        for (uint i = 0; i < _tokenIds.length; i++) {
+            id = _tokenIds[i];
+            require(ownerOf(id) == msg.sender, "Not owner of share.");
+            require(lockedIdToAddress[id] != address(0));
+            require(nonBaeringIdToId[id] != 0);
+            _burn(id);
+            delete lockedIdToAddress[id];
+            require(ownerOf(nonBaeringIdToId[id]) == address(this), "Share not in custody by contract"); // what am i doing here...
+            safeTransferFrom(address(this), msg.sender, nonBaeringIdToId[id]);
+            delete nonBaeringIdToId[id];
+        }
     }
 
     function _beforeTokenTransfer(address from, address to, uint256 tokenId, uint256 batchSize) internal override {
