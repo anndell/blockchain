@@ -33,9 +33,10 @@ abstract contract Settings is AccessControl, ERC721 {
     function setBurnEnabled(bool _enabled) external onlyRole(ADMIN) {
         require(!burnLocked, "Burn state is locked");
         burnEnabled = _enabled;
+        // add event
     }
 
-    function lockWhitelistState() public onlyRole(ADMIN) {
+    function lockWhitelistState() external onlyRole(ADMIN) {
         whitelistStateLocked = true;
         emit Lock(1);
     }
@@ -50,7 +51,7 @@ abstract contract Settings is AccessControl, ERC721 {
         emit Lock(3);
     }
 
-    function lockCap() public onlyRole(ADMIN) {
+    function lockCap() external onlyRole(ADMIN) {
         // require(supplyCap != 0, "Can not lock contract without issuing any shares");
         supplyCapLocked = true;
         emit Lock(4);

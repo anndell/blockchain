@@ -55,10 +55,11 @@ contract Anndell is Whitelist {
     event CalculateTokenDistribution(address token, uint newShareEarnings);
     event IssuanceLockedUntil(uint timestamp);
     event TokenLockedToContract(IERC721 tokenContract, uint id);
+    event PeriodAndDelay(uint period, uint delay);
     
     function issuanceOfShares(uint _nrToIssue) public onlyRole(ADMIN) {
         require(!supplyCapLocked, "No more shares can be issued");
-        require(supplyCap == circulatingSupply, "You can not issue more shares before minting existing ones");
+        require(supplyCap == circulatingSupply, "You can not issue more shares before minting existing ones"); // is this nessecary?
         require(_nrToIssue > 0, "Can not issue 0");
         if(lockIssuanceUntil != 0){
             require(lockIssuanceUntil < block.timestamp, "New issuance locked for a set time frame");
@@ -70,7 +71,7 @@ contract Anndell is Whitelist {
 
     function mint(address _to, uint _quantity) public onlyRole(MINT) {
         uint target = circulatingSupply + _quantity;
-        require(target <= supplyCap, "Cap overflow");
+        require(target <= supplyCap && (target + burnCount) / 10e21 == 0, "Cap overflow");
         uint idTarget = target + burnCount;
         for (uint256 index = circulatingSupply + burnCount + 1; index <= idTarget; index++) {
             _safeMint(_to, index);
@@ -115,7 +116,7 @@ contract Anndell is Whitelist {
         if (_token == address(0)){
             uint balance = address(this).balance - retroactiveTotals[address(0)];
             (address receiver, uint amount) = fee.getQuote(address(this), balance);
-            (bool sent, ) = receiver.call{value: amount}(""); // test if zero
+            (bool sent, ) = receiver.call{value: amount}("");
             require(sent, "Failed to transfer native token");
             balance -= amount;
             _period.shareEarnings += (balance - _period.earningsAccountedFor) / _period.startCap;
@@ -145,19 +146,17 @@ contract Anndell is Whitelist {
 
     function claimEarnings(address _token, uint _claimPeriod, address _owner, uint[] calldata _shareIds) public { // add loop over periods?
         uint totalToGet = _totalToGet(_token, _claimPeriod, _owner, _shareIds);
-        IERC20(_token).transfer(_owner, totalToGet); // test if zero
+        if(_token == address(0)){
+            (bool sent, ) = _owner.call{value: totalToGet}(""); // test if zero
+            require(sent, "Failed to transfer native token");
+        } else {
+            IERC20(_token).transfer(_owner, totalToGet); // test if zero
+        }
         emit EarningsClaimed(_owner, _token, totalToGet, _shareIds, _claimPeriod);
     }
 
-    function claimEarningsNative(uint _claimPeriod, address _owner, uint[] calldata _shareIds) public { // add loop over periods?
-        uint totalToGet = _totalToGet(address(0), _claimPeriod, _owner, _shareIds);
-        (bool sent, ) = _owner.call{value: totalToGet}(""); // test if zero
-        require(sent, "Failed to transfer native token");
-        emit EarningsClaimed(_owner, address(0), totalToGet, _shareIds, _claimPeriod);
-    }
-
     function _totalToGet(address _token, uint _periodIndex, address _owner, uint[] calldata _shareIds) internal returns (uint totalToGet){
-        require(_owner != address(this)); // I think you need to add this?!?!
+        require(_owner != address(this));
         ClaimPeriod storage period = token[_token][_periodIndex];
         if(claimWhiteListRequired){
             require(whitelistAddress.whitelist(_owner), "Address not whitelisted");
@@ -169,7 +168,7 @@ contract Anndell is Whitelist {
         for (uint256 index = 0; index < _shareIds.length; index++) {
             uint share = _shareIds[index];
             if(share < startMaxTokenId){ 
-                if (ownerOf(share) == _owner || lockedIdToAddress[share] == _owner) {// should be require? // what happens if you send in the contract as _owner?!?!
+                if (ownerOf(share) == _owner || lockedIdToAddress[share] == _owner) {
                     totalToGet += target - period.claimedPerShare[share];
                     period.claimedPerShare[share] = target;
                 }
@@ -190,17 +189,15 @@ contract Anndell is Whitelist {
     function _flush(uint _periodIndex, address _token) internal {
         ClaimPeriod storage period = token[_token][_periodIndex];
         require(period.start > block.timestamp + periodLength + flushDelay, "Not Possible to flush this deposit period yet.");
+        retroactiveTotals[_token] -= period.earningsAccountedFor;
         if(_token == address(0)){
-            retroactiveTotals[address(0)] -= period.earningsAccountedFor;
             uint toSend = period.earningsAccountedFor; // prevent reentrancy
-            period.earningsAccountedFor = 0;
             (bool sent, ) = msg.sender.call{value: toSend}("");
             require(sent, "Failed to transfer native token");
         }else{
-            retroactiveTotals[_token] -= period.earningsAccountedFor;
             IERC20(_token).transfer(msg.sender, period.earningsAccountedFor);
-            period.earningsAccountedFor = 0;
         }
+        period.earningsAccountedFor = 0;
         emit Flush(_token, _periodIndex);
     }
 
@@ -216,6 +213,7 @@ contract Anndell is Whitelist {
         require(firstPeriodStart == 0, "Contract already started");
         periodLength = _periodLength;
         flushDelay = _flushDelay;
+        emit PeriodAndDelay(_periodLength, _flushDelay);
     }
 
     function setLockIssuanceUntil(uint _timestamp) public onlyRole(ADMIN){
@@ -242,10 +240,10 @@ contract Anndell is Whitelist {
         for (uint i = 0; i < _tokenIds.length; i++) {
             id = _tokenIds[i];
             require(ownerOf(id) == msg.sender, "Not owner of share.");
-            require(nonBaeringIdToId[id] == 0);
+            require(nonBaeringIdToId[id] == 0 && id / 10e21 == 0);
             IERC721(address(this)).safeTransferFrom(msg.sender, address(this), id); // how does this work with whitelist and shit?
             lockedIdToAddress[id] = _receiverAddress;
-            idToIssue = id + 10e21; // put in check that we can never mint real ones higher than this number.
+            idToIssue = id + 10e21;
             nonBaeringIdToId[idToIssue] = id;
             _safeMint(msg.sender, idToIssue);
         }
@@ -266,7 +264,9 @@ contract Anndell is Whitelist {
 
     function releaseShares(IERC721 _address, address _to, uint[] memory _ids) public onlyRole(ADMIN){
         for (uint i = 0; i < _ids.length; i++) {
-            // require(_ids[i] ) // how do we check that the token is not a locked one by our users and is a non baering twin? 
+            if(address(_address) == address(this) && _ids[i] / 10e21 == 0) {
+                require(lockedIdToAddress[_ids[i]] == address(0) && nonBaeringIdToId[_ids[i]] == 0, "Not owned by contract, is a twin");
+            }
             require(!idLocked[_address][_ids[i]], "Token is locked to this contract");
             _address.safeTransferFrom(address(this), _to, _ids[i]);
         }

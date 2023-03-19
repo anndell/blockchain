@@ -22,22 +22,22 @@ module.exports = {
     hardhat: {
       allowUnlimitedContractSize: true,
     },
-    // BSCTestnet: {
-    //   url: `${BSC_RPC}`,
-    //   accounts: [`0x${BSCTESTNET_PRIVATE_KEY}`],
-    //   allowUnlimitedContractSize: true,
-    // },
+    BSCTestnet: {
+      url: `${BSC_RPC}`,
+      accounts: [`0x${TESTNET_PRIVATE_KEY}`],
+      allowUnlimitedContractSize: true,
+    },
   },
-  // gasReporter: {
-  //   currency: "USD",
-  //   token: "BNB",
-  //   gasPriceApi: "https://api.bscscan.com/api?module=proxy&action=eth_gasPrice",
-  //   coinmarketcap: "0431b70e-ffff-4061-81b0-fa361384d36c",
-  //   // enabled: (process.env.REPORT_GAS) ? true : false
-  // },
-  // etherscan: {
-  //   apiKey: BSCSCAN_API_KEY,
-  // },
+  gasReporter: {
+    currency: "USD",
+    token: "BNB",
+    gasPriceApi: "https://api.bscscan.com/api?module=proxy&action=eth_gasPrice",
+    coinmarketcap: "0431b70e-ffff-4061-81b0-fa361384d36c",
+    // enabled: (process.env.REPORT_GAS) ? true : false
+  },
+  etherscan: {
+    apiKey: BSCSCAN_API_KEY,
+  },
 };
 
 // https://api.bscscan.com/api?module=proxy&action=eth_gasPrice

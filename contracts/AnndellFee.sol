@@ -11,14 +11,14 @@ contract AnndellFee is AccessControl {
         _setupRole(DEFAULT_ADMIN_ROLE, _default_admin);
     }
 
-    uint constant public BASIS_POINTS = 10_000;
+    uint constant private BASIS_POINTS = 10_000;
     
     bytes32 public constant ADMIN = keccak256("ADMIN");
     bytes32 public constant FACTORY = keccak256("FACTORY");
 
-    bool public defaultSettings;
-    address public defaultReceiver;
-    uint public defaultFee;
+    bool private defaultSettings;
+    address private defaultReceiver;
+    uint private defaultFee;
 
     mapping(address => PercentageAndReceiver) public percentagesAndReceivers;
 
