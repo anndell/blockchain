@@ -9,6 +9,8 @@ contract Factory {
         fee = _anndellFee;
     }
 
+    mapping(address => bool) public isAnndell;
+
     IAnndellFee private fee;
 
     event CollectionCreated(address AnndellAddress, string name, string symbol, address initiator);
@@ -24,6 +26,7 @@ contract Factory {
         }
         require(collection != address(0), "Failed to create Anndell collection");
         fee.setQuote(collection);
+        isAnndell[collection] = true;
         emit CollectionCreated(collection, _name, _symbol, msg.sender);
     }
 }

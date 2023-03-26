@@ -4,12 +4,14 @@ pragma solidity ^0.8.17;
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/utils/ERC721Holder.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
-import "../contracts/Whitelist.sol";
 import "../interfaces/IAnndellFee.sol";
 import "../interfaces/IAnndell.sol"; 
 
-contract AnndellSplit is Whitelist {
+contract AnndellSplit is ERC721 {
+
+    bytes32 public constant ADMIN = keccak256("ADMIN");
 
     // make sure both are anndell contracts
     constructor (IAnndell _root, address _parent, IAnndellFee _anndellFee, uint _splitLevel) ERC721 ("", "") { 
@@ -20,6 +22,11 @@ contract AnndellSplit is Whitelist {
         periodLength = root.periodLength();
         flushDelay = root.flushDelay();
         firstPeriodStart = root.firstPeriodStart();
+    }
+
+    modifier hasRoleInRoot(bytes32 role){
+        require(root.hasRole(role, msg.sender), "Not correct Role in root");
+        _;
     }
 
     IAnndell public root;
@@ -153,8 +160,8 @@ contract AnndellSplit is Whitelist {
     function _totalToGet(address _token, uint _periodIndex, address _owner, uint[] calldata _shareIds) internal returns (uint totalToGet){
         require(_owner != address(this));
         ClaimPeriod storage period = token[_token][_periodIndex];
-        if(claimWhiteListRequired){
-            require(whitelistAddress.whitelist(_owner), "Address not whitelisted");
+        if(root.claimWhiteListRequired()){
+            // require(root.whitelistAddress().whitelist(_owner), "Address not whitelisted");
         }
         require(period.earningsAccountedFor != 0, "Nothing to claim or flushed"); // CHECK FLUSHED?
         uint target = period.shareEarnings;
@@ -177,7 +184,7 @@ contract AnndellSplit is Whitelist {
         period.earningsAccountedFor -= totalToGet; // TEST IF FAIL ON FLUSHED
     } 
 
-    function flush(uint _periodIndex, address[] calldata _tokens) external onlyRole(ADMIN){
+    function flush(uint _periodIndex, address[] calldata _tokens) external hasRoleInRoot(ADMIN) {
         for (uint256 index = 0; index < _tokens.length; index++) {
             _flush(_periodIndex, _tokens[index]);
         }
@@ -198,8 +205,8 @@ contract AnndellSplit is Whitelist {
         emit Flush(_token, _periodIndex);
     }
 
-    function adminForceBackShares(uint[] calldata _ids, address _to) external onlyRole(ADMIN){
-        require(!adminForceBackDisabled, "Force back has been disabled");
+    function adminForceBackShares(uint[] calldata _ids, address _to) external hasRoleInRoot(ADMIN) {
+        require(!root.adminForceBackDisabled(), "Force back has been disabled");
         for (uint256 index = 0; index < _ids.length; index++) {
             _transfer(ownerOf(_ids[index]), _to, _ids[index]);
         }
@@ -240,7 +247,7 @@ contract AnndellSplit is Whitelist {
         }
     }
 
-    function releaseShares(IERC721 _address, address _to, uint[] memory _ids) external onlyRole(ADMIN){ // this must be better checked
+    function releaseShares(IERC721 _address, address _to, uint[] memory _ids) external hasRoleInRoot(ADMIN) { // this must be better checked
         for (uint i = 0; i < _ids.length; i++) {
             if(address(_address) == address(this) && _ids[i] / 10e21 == 0) {
                 require(lockedIdToAddress[_ids[i]] == address(0) && nonBaeringIdToId[_ids[i]] == 0, "Not owned by contract, is a twin");
@@ -251,10 +258,10 @@ contract AnndellSplit is Whitelist {
 
     function _beforeTokenTransfer(address from, address to, uint256 tokenId, uint256 batchSize) internal override {
         super._beforeTokenTransfer(from, to, tokenId, batchSize);
-        if (!(from == address(0) || hasRole(ADMIN, msg.sender))) {
-            require(!transferBlocked, "Transfers are currently blocked");
-            if(transferWhiteListRequired) {
-                require(whitelistAddress.whitelist(from) && whitelistAddress.whitelist(to),"Invalid token transfer");
+        if (!(from == address(0) || root.hasRole(ADMIN, msg.sender))) {
+            require(!root.transferBlocked(), "Transfers are currently blocked");
+            if(root.transferWhiteListRequired()) {
+                // require(root.whitelistAddress().whitelist(from) && root.whitelistAddress().whitelist(to),"Invalid token transfer");
             }
         }
     }
@@ -269,6 +276,6 @@ contract AnndellSplit is Whitelist {
     }
 
     function _baseURI() internal view virtual override returns (string memory) {
-        return baseURI_;
+        return string.concat(root.baseURI(), (string.concat(Strings.toString(splitLevel), "/")));
     }
 }
