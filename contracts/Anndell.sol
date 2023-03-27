@@ -1,20 +1,23 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.17;
 
-import "@openzeppelin/contracts/interfaces/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC721/utils/ERC721Holder.sol";
-import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC721/utils/ERC721HolderUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC721/IERC721Upgradeable.sol";
 import "../contracts/Whitelist.sol";
 import "../interfaces/IAnndellFee.sol";
 
-contract Anndell is Whitelist {
+contract Anndell is Whitelist{
 
-    constructor (string memory _name, string memory _symbol, address _default_admin, IAnndellFee _anndellFee) ERC721 (_name, _symbol) {
+    function initialize (string memory _name, string memory _symbol, address _default_admin, IAnndellFee _anndellFee) public initializer{ // INTIALIZE ERC721
         _setupRole(DEFAULT_ADMIN_ROLE, _default_admin);
         whitelistAddress = this;
         name_ = _name;
         symbol_ = _symbol;
+        __ERC721_init(_name, _symbol);
         fee = _anndellFee;
+        periodLength = 365 days;
+        flushDelay = 90 days;
     }
 
     IAnndellFee private fee;
@@ -28,10 +31,10 @@ contract Anndell is Whitelist {
     uint public lockIssuanceUntil;
     
     uint public firstPeriodStart;
-    uint public periodLength = 365 days;
-    uint public flushDelay = 90 days;
+    uint public periodLength;
+    uint public flushDelay;
 
-    mapping(IERC721 => mapping (uint => bool)) public idLocked;
+    mapping(IERC721Upgradeable => mapping (uint => bool)) public idLocked;
 
     mapping(address => uint) public retroactiveTotals;
     mapping(address => ClaimPeriod[]) public token;
@@ -54,7 +57,7 @@ contract Anndell is Whitelist {
     event ForceBackShares(uint[] shareIds);
     event CalculateTokenDistribution(address token, uint newShareEarnings);
     event IssuanceLockedUntil(uint timestamp);
-    event TokenLockedToContract(IERC721 tokenContract, uint id);
+    event TokenLockedToContract(IERC721Upgradeable tokenContract, uint id);
     event PeriodAndDelay(uint period, uint delay);
     
     function issuanceOfShares(uint _nrToIssue) public onlyRole(ADMIN) {
@@ -122,9 +125,9 @@ contract Anndell is Whitelist {
             _period.shareEarnings += (balance - _period.earningsAccountedFor) / _period.startCap;
             _period.earningsAccountedFor = balance;
         }else {
-            uint balance = IERC20(_token).balanceOf(address(this)) - retroactiveTotals[_token];
+            uint balance = IERC20Upgradeable(_token).balanceOf(address(this)) - retroactiveTotals[_token];
             (address receiver, uint amount) = fee.getQuote(address(this), balance);
-            IERC20(_token).transfer(receiver, amount);
+            IERC20Upgradeable(_token).transfer(receiver, amount);
             balance -= amount;
             _period.shareEarnings += (balance - _period.earningsAccountedFor) / _period.startCap;
             _period.earningsAccountedFor = balance;
@@ -150,7 +153,7 @@ contract Anndell is Whitelist {
             (bool sent, ) = _owner.call{value: totalToGet}(""); // test if zero
             require(sent, "Failed to transfer native token");
         } else {
-            IERC20(_token).transfer(_owner, totalToGet); // test if zero
+            IERC20Upgradeable(_token).transfer(_owner, totalToGet); // test if zero
         }
         emit EarningsClaimed(_owner, _token, totalToGet, _shareIds, _claimPeriod);
     }
@@ -195,7 +198,7 @@ contract Anndell is Whitelist {
             (bool sent, ) = msg.sender.call{value: toSend}("");
             require(sent, "Failed to transfer native token");
         }else{
-            IERC20(_token).transfer(msg.sender, period.earningsAccountedFor);
+            IERC20Upgradeable(_token).transfer(msg.sender, period.earningsAccountedFor);
         }
         period.earningsAccountedFor = 0;
         emit Flush(_token, _periodIndex);
@@ -241,7 +244,7 @@ contract Anndell is Whitelist {
             id = _tokenIds[i];
             require(ownerOf(id) == msg.sender, "Not owner of share.");
             require(nonBaeringIdToId[id] == 0 && id / 10e21 == 0);
-            IERC721(address(this)).safeTransferFrom(msg.sender, address(this), id); // how does this work with whitelist and shit?
+            IERC721Upgradeable(address(this)).safeTransferFrom(msg.sender, address(this), id); // how does this work with whitelist and shit?
             lockedIdToAddress[id] = _receiverAddress;
             idToIssue = id + 10e21;
             nonBaeringIdToId[idToIssue] = id;
@@ -262,7 +265,7 @@ contract Anndell is Whitelist {
         }
     }
 
-    function releaseShares(IERC721 _address, address _to, uint[] memory _ids) public onlyRole(ADMIN){
+    function releaseShares(IERC721Upgradeable _address, address _to, uint[] memory _ids) public onlyRole(ADMIN){
         for (uint i = 0; i < _ids.length; i++) {
             if(address(_address) == address(this) && _ids[i] / 10e21 == 0) {
                 require(lockedIdToAddress[_ids[i]] == address(0) && nonBaeringIdToId[_ids[i]] == 0, "Not owned by contract, is a twin");
@@ -272,7 +275,7 @@ contract Anndell is Whitelist {
         }
     }
 
-    function lockSharesToContract(IERC721 _address, uint[] memory _ids) public onlyRole(ADMIN) {
+    function lockSharesToContract(IERC721Upgradeable _address, uint[] memory _ids) public onlyRole(ADMIN) {
         for (uint i = 0; i < _ids.length; i++) {
             if(address(this) == _address.ownerOf(_ids[i])){
                 idLocked[_address][_ids[i]] = true;

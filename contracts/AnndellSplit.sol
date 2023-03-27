@@ -1,20 +1,22 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.17;
 
-import "@openzeppelin/contracts/interfaces/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC721/utils/ERC721Holder.sol";
-import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
-import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
-import "@openzeppelin/contracts/utils/Strings.sol";
+
+import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC721/utils/ERC721HolderUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC721/IERC721Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC721/ERC721Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/StringsUpgradeable.sol";
 import "../interfaces/IAnndellFee.sol";
 import "../interfaces/IAnndell.sol"; 
 
-contract AnndellSplit is ERC721 {
+contract AnndellSplit is ERC721Upgradeable {
 
     bytes32 public constant ADMIN = keccak256("ADMIN");
 
     // make sure both are anndell contracts
-    constructor (IAnndell _root, address _parent, IAnndellFee _anndellFee, uint _splitLevel) ERC721 ("", "") { 
+    function initialize (IAnndell _root, address _parent, IAnndellFee _anndellFee, uint _splitLevel) public initializer{ 
+        __ERC721_init("", "");
         root = _root;
         parent = _parent;
         splitLevel = _splitLevel;
@@ -65,8 +67,8 @@ contract AnndellSplit is ERC721 {
 
     function deposit(uint[] memory _tokens) external {
         for (uint i = 0; i < _tokens.length; i++) {
-            require(msg.sender == IERC721(parent).ownerOf(_tokens[i]));
-            IERC721(parent).safeTransferFrom(msg.sender, address(this), _tokens[i]);
+            require(msg.sender == IERC721Upgradeable(parent).ownerOf(_tokens[i]));
+            IERC721Upgradeable(parent).safeTransferFrom(msg.sender, address(this), _tokens[i]);
             tokensFromAbove.push(_tokens[i]);
             for (uint j = tokenCount + 1; j < tokenCount + 11; j++) {
                 _safeMint(msg.sender, j);
@@ -85,7 +87,7 @@ contract AnndellSplit is ERC721 {
                 _burn(_tokens[j]);
             }
             supply -= 10;
-            IERC721(parent).safeTransferFrom(address(this), msg.sender, tokensFromAbove[tokensFromAbove.length - 1]);
+            IERC721Upgradeable(parent).safeTransferFrom(address(this), msg.sender, tokensFromAbove[tokensFromAbove.length - 1]);
             tokensFromAbove.pop();
         }
     }
@@ -134,9 +136,9 @@ contract AnndellSplit is ERC721 {
             _period.shareEarnings += (balance - _period.earningsAccountedFor) / _period.supply;
             _period.earningsAccountedFor = balance;
         }else {
-            uint balance = IERC20(_token).balanceOf(address(this)) - retroactiveTotals[_token];
+            uint balance = IERC20Upgradeable(_token).balanceOf(address(this)) - retroactiveTotals[_token];
             (address receiver, uint amount) = fee.getQuote(address(this), balance);
-            IERC20(_token).transfer(receiver, amount);
+            IERC20Upgradeable(_token).transfer(receiver, amount);
             balance -= amount;
             _period.shareEarnings += (balance - _period.earningsAccountedFor) / _period.supply;
             _period.earningsAccountedFor = balance;
@@ -151,7 +153,7 @@ contract AnndellSplit is ERC721 {
                 (bool sent, ) = _owner.call{value: totalToGet}(""); // test if zero
                 require(sent, "Failed to transfer native token");
             } else {
-                IERC20(_token).transfer(_owner, totalToGet); // test if zero
+                IERC20Upgradeable(_token).transfer(_owner, totalToGet); // test if zero
             }
         }
         emit EarningsClaimed(_owner, _token, totalToGet, _shareIds, _claimPeriod);
@@ -199,7 +201,7 @@ contract AnndellSplit is ERC721 {
             (bool sent, ) = msg.sender.call{value: toSend}("");
             require(sent, "Failed to transfer native token");
         }else{
-            IERC20(_token).transfer(msg.sender, period.earningsAccountedFor);
+            IERC20Upgradeable(_token).transfer(msg.sender, period.earningsAccountedFor);
         }
         period.earningsAccountedFor = 0;
         emit Flush(_token, _periodIndex);
@@ -226,7 +228,7 @@ contract AnndellSplit is ERC721 {
             id = _tokenIds[i];
             require(ownerOf(id) == msg.sender, "Not owner of share.");
             require(nonBaeringIdToId[id] == 0 && id / 10e21 == 0);
-            IERC721(address(this)).safeTransferFrom(msg.sender, address(this), id); // how does this work with whitelist and shit?
+            IERC721Upgradeable(address(this)).safeTransferFrom(msg.sender, address(this), id); // how does this work with whitelist and shit?
             lockedIdToAddress[id] = _receiverAddress;
             idToIssue = id + 10e21;
             nonBaeringIdToId[idToIssue] = id;
@@ -247,7 +249,7 @@ contract AnndellSplit is ERC721 {
         }
     }
 
-    function releaseShares(IERC721 _address, address _to, uint[] memory _ids) external hasRoleInRoot(ADMIN) { // this must be better checked
+    function releaseShares(IERC721Upgradeable _address, address _to, uint[] memory _ids) external hasRoleInRoot(ADMIN) { // this must be better checked
         for (uint i = 0; i < _ids.length; i++) {
             if(address(_address) == address(this) && _ids[i] / 10e21 == 0) {
                 require(lockedIdToAddress[_ids[i]] == address(0) && nonBaeringIdToId[_ids[i]] == 0, "Not owned by contract, is a twin");
@@ -267,15 +269,15 @@ contract AnndellSplit is ERC721 {
     }
 
     function name() public view override returns (string memory) {
-        return string.concat(root.name(), (string.concat(" 1/", Strings.toString(splitLevel))));
+        return string.concat(root.name(), (string.concat(" 1/", StringsUpgradeable.toString(splitLevel))));
         
     }
 
     function symbol() public view override returns (string memory) {
-        return string.concat(root.symbol(), (string.concat(" 1/", Strings.toString(splitLevel))));
+        return string.concat(root.symbol(), (string.concat(" 1/", StringsUpgradeable.toString(splitLevel))));
     }
 
     function _baseURI() internal view virtual override returns (string memory) {
-        return string.concat(root.baseURI(), (string.concat(Strings.toString(splitLevel), "/")));
+        return string.concat(root.baseURI(), (string.concat(StringsUpgradeable.toString(splitLevel), "/")));
     }
 }
