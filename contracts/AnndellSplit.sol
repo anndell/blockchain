@@ -1,6 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.17;
 
+// anndellsplit.sol is an advanced Solidity contract that extends the Anndell tokenization platform, 
+// enabling hierarchical split collections of NFTs, and allowing for the division of NFT ownership 
+// across multiple sub-levels while maintaining a connection to the root Anndell contract. 
+// Key features include initialization, split level tracking, fund distribution and withdrawal, and 
+// event emission, with the contract designed to work seamlessly alongside the AnndellFee contract for 
+// fee management.
 
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC721/utils/ERC721HolderUpgradeable.sol";
@@ -10,7 +16,7 @@ import "@openzeppelin/contracts-upgradeable/utils/StringsUpgradeable.sol";
 import "../interfaces/IAnndellFee.sol";
 import "../interfaces/IAnndell.sol"; 
 
-contract AnndellSplit is ERC721Upgradeable {
+contract AnndellSplit is ERC721Upgradeable, ERC721HolderUpgradeable {
 
     bytes32 public constant ADMIN = keccak256("ADMIN");
 
@@ -65,8 +71,10 @@ contract AnndellSplit is ERC721Upgradeable {
     event ForceBackShares(uint[] shareIds);
     event CalculateTokenDistribution(address token, uint newShareEarnings);
 
+    // require that it is a non-baering token
     function deposit(uint[] memory _tokens) external {
         for (uint i = 0; i < _tokens.length; i++) {
+            require(_tokens[i] / 10e21 == 0, "Can not deposit non-bearing Anndell token");
             require(msg.sender == IERC721Upgradeable(parent).ownerOf(_tokens[i]));
             IERC721Upgradeable(parent).safeTransferFrom(msg.sender, address(this), _tokens[i]);
             tokensFromAbove.push(_tokens[i]);
@@ -83,6 +91,7 @@ contract AnndellSplit is ERC721Upgradeable {
         require(l > 0 && l % 10 == 0);
         for (uint256 i = 0; i < l/10; i++) {
             for (uint256 j = 0; j < (i + 1) * 10; j++) {
+                require(_tokens[j] / 10e21 == 0, "Can not release Anndell token with non-baering tokens");
                 require(ownerOf(_tokens[j]) == msg.sender);
                 _burn(_tokens[j]);
             }
@@ -163,7 +172,7 @@ contract AnndellSplit is ERC721Upgradeable {
         require(_owner != address(this));
         ClaimPeriod storage period = token[_token][_periodIndex];
         if(root.claimWhiteListRequired()){
-            // require(root.whitelistAddress().whitelist(_owner), "Address not whitelisted");
+            require(root.isAddressWhitelisted(_owner), "Address not whitelisted");
         }
         require(period.earningsAccountedFor != 0, "Nothing to claim or flushed"); // CHECK FLUSHED?
         uint target = period.shareEarnings;
@@ -263,7 +272,7 @@ contract AnndellSplit is ERC721Upgradeable {
         if (!(from == address(0) || root.hasRole(ADMIN, msg.sender))) {
             require(!root.transferBlocked(), "Transfers are currently blocked");
             if(root.transferWhiteListRequired()) {
-                // require(root.whitelistAddress().whitelist(from) && root.whitelistAddress().whitelist(to),"Invalid token transfer");
+                require(root.isAddressWhitelisted(from) && root.isAddressWhitelisted(to),"Invalid token transfer");
             }
         }
     }

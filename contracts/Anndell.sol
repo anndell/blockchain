@@ -1,4 +1,31 @@
 // SPDX-License-Identifier: MIT
+
+// Title: Anndell Blockchain Smart Contracts
+
+// Description:
+
+// This repository contains the Anndell platform's blockchain smart contracts, which are developed 
+// using Solidity and are deployed on the Ethereum network. These smart contracts form the backbone 
+// of the Anndell platform, enabling the creation, management, and transfer of NFT collections.
+
+// Key Features:
+
+// Creation of NFT collections using the Factory contract.
+// Management of NFT collections through the Anndell, Settings, and Whitelist contracts.
+// Secure and flexible access control using the OpenZeppelin AccessControlUpgradeable library.
+// Whitelisting functionality for transfers and claims.
+// Event emissions for critical contract actions, enabling seamless integration with the listener.
+// This repository is part of a larger project comprising four main components: blockchain, listener,
+// API, and client. The smart contracts in this repository interact with the listener, which listens
+// to emitted events and updates a MongoDB database accordingly. The API provides data from the
+// database, and the React.js-based frontend client allows users to interact with the platform.
+
+// To get started with the Anndell Blockchain Smart Contracts, please follow the instructions in
+// the README file for installation, deployment, and testing.
+
+// Please note that this repository contains only the blockchain smart contracts for the Anndell platform.
+// Be sure to explore the other repositories (listener, API, and client) for a comprehensive understanding
+// of the platform's architecture and functionality.
 pragma solidity ^0.8.17;
 
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
@@ -9,7 +36,7 @@ import "../interfaces/IAnndellFee.sol";
 
 contract Anndell is Whitelist{
 
-    function initialize (string memory _name, string memory _symbol, address _default_admin, IAnndellFee _anndellFee) public initializer{ // INTIALIZE ERC721
+    function initialize (string memory _name, string memory _symbol, address _default_admin, IAnndellFee _anndellFee) public initializer{
         _setupRole(DEFAULT_ADMIN_ROLE, _default_admin);
         whitelistAddress = this;
         name_ = _name;
@@ -24,7 +51,7 @@ contract Anndell is Whitelist{
 
     bytes32 public constant MINT = keccak256("MINT");
 
-    uint public supplyCap;
+    uint public supplyCap; 
     uint public circulatingSupply;
     uint public burnCount;
 

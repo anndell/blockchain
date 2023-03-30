@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.17;
 
+// settings.sol is a Solidity smart contract that serves as the configuration center for the Anndell ecosystem,
+// providing a centralized point of management for various parameters and settings. This contract enables the 
+// platform's administrator to define and update key settings, such as fees, factory addresses, and whitelist 
+// addresses, ensuring the smooth operation and adaptability of the platform. By offering a unified place for 
+// managing settings, settings.sol enhances the maintainability and flexibility of the Anndell ecosystem, 
+// allowing it to evolve and adapt to changing requirements and conditions.
+
 import "@openzeppelin/contracts-upgradeable/token/ERC721/ERC721Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 

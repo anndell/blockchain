@@ -1,6 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.17;
 
+// anndellfee.sol is a fee management contract for the Anndell tokenization platform, designed to handle
+//  fees associated with distributing funds to NFT holders in Anndell and AnndellSplit contracts. 
+//  This contract calculates and enforces fees, ensuring the platform's sustainability and providing 
+//  transparency for users. It plays a key role in maintaining the platform's viability while offering 
+//  clear cost structures for its users.
+
 import "@openzeppelin/contracts/access/AccessControl.sol";
 
 contract AnndellFee is AccessControl {

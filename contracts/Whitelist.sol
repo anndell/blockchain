@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.17;
 
+// whitelist.sol is a Solidity smart contract that implements a whitelist functionality for 
+// token sales or restricted access to specific functions within a smart contract system. 
+// The contract allows the contract owner to add or remove addresses from the whitelist, 
+// enabling or disabling their access to restricted features. This can be useful in scenarios 
+// such as ICOs, private sales, or limiting access to specific contract functions to a selected 
+// group of users.
+
 import "../contracts/Settings.sol";
 
 abstract contract Whitelist is Settings{
@@ -56,5 +63,10 @@ abstract contract Whitelist is Settings{
         require(whitelistAddressLocked, "Whitelist address is locked.");
         emit ChangeWhitelist(address(whitelistAddress), address(newWhitelist));
         whitelistAddress = newWhitelist;
+    }
+
+    // for split contracts to be able to check in the root contract 
+    function isAddressWhitelisted(address _address) external view returns (bool) {
+        return whitelistAddress.whitelist(_address);
     }
 }

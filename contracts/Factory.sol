@@ -1,6 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.17;
 
+// factory.sol is a Solidity smart contract responsible for creating new instances of Anndell contracts, 
+// the core building blocks of the Anndell tokenization platform. The Factory contract ensures that each 
+// new Anndell contract is properly initialized with the required parameters such as asset details, token 
+// settings, and fee settings. Additionally, factory.sol maintains a mapping of all created Anndell 
+// contracts, allowing for easy verification and lookup of contract addresses on the platform. By providing 
+// a standardized and efficient way to create and manage Anndell contracts, factory.sol serves as a critical 
+// component in the overall Anndell ecosystem, enabling seamless growth and expansion of tokenized assets 
+// on the platform.
+
 import "../interfaces/IAnndellFee.sol";
 import "contracts/Anndell.sol";
 import "@openzeppelin/contracts/proxy/Clones.sol";
